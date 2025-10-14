@@ -45,7 +45,7 @@ class StudentInfoResponse(BaseModel):
 
 
 
-@router.get("/", response_model=StudentInfoResponse)
+@router.get("", response_model=StudentInfoResponse)
 def get_student_info(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
