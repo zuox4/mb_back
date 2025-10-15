@@ -24,7 +24,7 @@ class AdminAuth(AuthenticationBackend):
         username, password = form["username"], form["password"]
 
         # Временные креды - замените на свои!
-        if username == "admin" and password == "admin123":
+        if username == "admin" and password == "xzSAwq21!":
             request.session.update({"token": "admin-token"})
             return True
         return False
@@ -83,8 +83,8 @@ class PossibleResultsAdmin(ModelView, model=PossibleResult):
 
 # Админка для событий
 class EventAdmin(ModelView, model=Event):
-    name = "Событие"
-    name_plural = "События"
+    name = "Мероприятия"
+    name_plural = "Мероприятия"
     icon = "fa-solid fa-calendar"
 
     column_list = [Event.id, Event.title, Event.academic_year, Event.is_active]
@@ -117,8 +117,8 @@ class ProjectOfficeAdmin(ModelView, model=ProjectOffice):
 
 # Админка для групп
 class GroupAdmin(ModelView, model=Group):
-    name = "Группа"
-    name_plural = "Группы"
+    name = "Классы"
+    name_plural = "Классы"
     icon = "fa-solid fa-users"
 
     column_list = [Group.id, Group.name]
@@ -126,8 +126,8 @@ class GroupAdmin(ModelView, model=Group):
 
 # Админка для типов событий
 class EventTypeAdmin(ModelView, model=EventType):
-    name = "Тип события"
-    name_plural = "Типы событий"
+    name = "Тип мероприятий"
+    name_plural = "Типы мероприятий"
     icon = "fa-solid fa-tags"
 
     column_list = [EventType.id, EventType.title]
@@ -140,8 +140,8 @@ class EventTypeAdmin(ModelView, model=EventType):
 
 # Админка для этапов
 class StageAdmin(ModelView, model=Stage):
-    name = "Этап"
-    name_plural = "Этапы"
+    name = "Этапы типов мероприятий"
+    name_plural = "Этапы типов мероприятий"
     icon = "fa-solid fa-stairs"
 
     column_list = [Stage.id, Stage.title, Stage.min_score_for_finished]
