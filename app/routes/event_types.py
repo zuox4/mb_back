@@ -69,7 +69,7 @@ def get_event_type(event_type_id: int, db: Session = Depends(get_db),current_use
 
 
 @router.post(
-    "/",
+    "",
     response_model=EventTypeResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Создать тип мероприятия",
