@@ -307,12 +307,16 @@ async def google_auth(
         print(google_user_info)
         # Аутентифицируем или создаем пользователя
         user = db.query(User).filter(User.email == google_user_info['email']).first()
-
+        if not user:
+            raise HTTPException(
+                status_code=403,
+                detail="Аккаунт не найден."
+            )
         # Проверяем активен ли аккаунт
         if not user.is_active:
             raise HTTPException(
                 status_code=403,
-                detail="Аккаунт отключен. Пожалуйста свяжитесь с администратором"
+                detail="Для входа через электронную почту необходимо пройти первичную регистрацию"
             )
 
         # Обновляем время последнего входа
@@ -350,4 +354,4 @@ async def google_auth(
     except ValueError as e:
         raise HTTPException(status_code=401, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Ошибка при аутентификации через Google")
+        raise HTTPException(status_code=500, detail=str(e))
