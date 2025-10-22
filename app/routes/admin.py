@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 from pydantic import BaseModel, ConfigDict
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 from app.database import get_db
-from app.database.models import Event, EventType, Stage
+from app.database.models import Event, EventType, Stage, Group, ProjectOffice, p_office_group_association
 from app.services.sync_service import TeacherSyncService, StudentSyncService
 
 router = APIRouter()
@@ -124,7 +124,7 @@ def get_all_events(db: Session = Depends(get_db)):
     summary="Создать мероприятие",
     description="Создание нового мероприятия с указанием всех необходимых данных"
 )
-async def create_event(
+def create_event(
         event_data: EventCreate,
         db: Session = Depends(get_db)
 ):
@@ -208,7 +208,7 @@ async def create_event(
     summary="Обновить мероприятие",
     description="Обновление данных существующего мероприятия"
 )
-async def update_event(
+def update_event(
         event_id: int,
         event_data: EventCreate,
         db: Session = Depends(get_db)
@@ -289,7 +289,7 @@ async def update_event(
     summary="Удалить мероприятие",
     description="Удаление мероприятия по ID"
 )
-async def delete_event(
+def delete_event(
         event_id: int,
         db: Session = Depends(get_db)
 ):
@@ -324,3 +324,38 @@ async def delete_event(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Произошла внутренняя ошибка при удалении мероприятия"
         )
+
+
+
+
+class GroupResponse(BaseModel):
+    id: int
+    name: str
+
+
+
+@router.get('/all_groups')
+def all_groups(db: Session = Depends(get_db)):
+    groups = db.query(Group).all()
+    return groups
+
+class GroupCreateRequest(BaseModel):
+    name: str
+
+
+@router.post('/create-group')
+def create_group(group_data: GroupCreateRequest, db: Session = Depends(get_db)):
+    # Проверяем, существует ли группа с таким именем
+    existing_group = db.query(Group).filter(Group.name == group_data.name).first()
+    if existing_group:
+        raise HTTPException(
+            status_code=400,
+            detail="Group with this name already exists"
+        )
+
+    # Создаем новую группу
+    new_group = Group(name=group_data.name)
+    db.add(new_group)
+    db.commit()
+    db.refresh(new_group)
+    return GroupResponse(id=new_group.id, name=new_group.name)

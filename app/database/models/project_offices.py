@@ -17,8 +17,12 @@ class ProjectOffice(Base):
     leader_uid = Column(Integer, ForeignKey('users.id'))
 
     # Отношение многие-ко-многим для классов
-    accessible_classes = relationship("Group", secondary=p_office_group_association)
-
+    accessible_classes = relationship(
+        "Group",
+        secondary=p_office_group_association,
+        back_populates="project_offices",  # добавляем back_populates
+        lazy="selectin"
+    )
     # Отношение к владельцу проекта
     leader = relationship("User", back_populates="p_office")
 
