@@ -1,3 +1,4 @@
+import datetime
 from typing import List
 from sqlalchemy.orm import Session
 from app.services.sync_service.schemas.sync_schemas import StudentResponse, SyncStats
@@ -21,8 +22,9 @@ class StudentSyncService(BaseSyncService[StudentResponse]):
 
     def _should_update_email(self, user: User, student: StudentResponse) -> bool:
         """Проверяет нужно ли обновлять email ученика"""
-        external_email = self._get_external_email(student)
-        return external_email and external_email != user.email
+        # В базовом классе теперь используется email_mapping, так что всегда возвращаем True
+        # чтобы email обновлялся согласно маппингу
+        return True
 
     def _get_external_email(self, student: StudentResponse) -> str:
         """Получает email из внешней БД или генерирует новый если его нет"""
@@ -74,29 +76,4 @@ class StudentSyncService(BaseSyncService[StudentResponse]):
             'password_hash': get_password_hash("temporary_password_123")
         }
 
-    def _process_single_item(self, db: Session, student: StudentResponse, role: Role, stats: SyncStats):
-        """Обработка одного ученика с улучшенным логированием"""
-        try:
-            existing_user = db.query(User).filter(User.external_id == student.uid).first()
-
-            if existing_user:
-                if self._update_item(existing_user, student, role):
-                    stats.updated += 1
-
-                    # Детальное логирование изменений
-                    external_email = self._get_external_email(student)
-                    if external_email and external_email != existing_user.email:
-                        print(f"📧 Обновлен email: {student.display_name} -> {external_email}")
-                    else:
-                        print(f"🔄 Обновлен: {student.display_name} -> {student.email}{external_email}")
-                        print(f"🔄 Обновлен: {student.display_name}")
-            else:
-                self._add_item(db, student, role)
-                stats.added += 1
-                db.commit()
-                email = self._get_external_email(student)
-                print(f"✅ Добавлен: {student.display_name} ({email})")
-
-        except Exception as e:
-            stats.errors.append(f"{student.display_name}: {str(e)}")
-            print(f"❌ Ошибка: {student.display_name} - {e}")
+    # УБРАТЬ переопределенный _process_single_item - использовать базовый
