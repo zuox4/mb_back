@@ -359,3 +359,14 @@ def create_group(group_data: GroupCreateRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_group)
     return GroupResponse(id=new_group.id, name=new_group.name)
+
+
+@router.get("/get_offices")
+def get_offices(db: Session = Depends(get_db)):
+    offices = db.query(ProjectOffice).all()
+    return offices
+
+@router.get("/get_office/{office_id}")
+def get_offices(office_id:int, db: Session = Depends(get_db)):
+    office = db.query(ProjectOffice).filter(ProjectOffice.id == office_id).first()
+    return office
