@@ -19,7 +19,8 @@ class TeacherSyncService(BaseSyncService[TeacherResponse]):
 
     def _should_update_email(self, user: User, teacher: TeacherResponse) -> bool:
         """Проверяет нужно ли обновлять email учителя"""
-        return teacher.email and user.email != teacher.email
+        # В базовом классе теперь используется email_mapping, так что всегда возвращаем True
+        return True
 
     def _get_item_email(self, teacher: TeacherResponse) -> str:
         """Получает email учителя"""
@@ -50,26 +51,4 @@ class TeacherSyncService(BaseSyncService[TeacherResponse]):
             'groups_leader': teacher.leader_groups
         }
 
-    def _process_single_item(self, db: Session, teacher: TeacherResponse, role: Role, stats: SyncStats):
-        """Обработка одного учителя с улучшенным логированием"""
-        try:
-            existing_user = db.query(User).filter(User.external_id == teacher.uid).first()
-
-            if existing_user:
-                if self._update_item(existing_user, teacher, role):
-                    stats.updated += 1
-
-                    # Детальное логирование изменений для учителей
-                    if teacher.email and teacher.email != existing_user.email:
-                        print(f"📧 Обновлен email учителя: {teacher.display_name} -> {teacher.email}")
-                    else:
-                        print(f"🔄 Обновлен учитель: {teacher.display_name}")
-            else:
-                self._add_item(db, teacher, role)
-                stats.added += 1
-                db.commit()
-                print(f"✅ Добавлен учитель: {teacher.display_name} ({teacher.email})")
-
-        except Exception as e:
-            stats.errors.append(f"{teacher.display_name}: {str(e)}")
-            print(f"❌ Ошибка учителя: {teacher.display_name} - {e}")
+    # УБРАТЬ переопределенный _process_single_item - использовать базовый
