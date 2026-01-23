@@ -5,7 +5,7 @@ from typing import Optional, List
 from datetime import datetime
 
 from app.database import get_db
-from app.database.models import Event, EventType, Stage, Group, ProjectOffice, p_office_group_association
+from app.database.models import Event, EventType, Stage, Group, ProjectOffice, p_office_group_association, User
 from app.services.sync_service import TeacherSyncService, StudentSyncService
 
 router = APIRouter()
@@ -364,9 +364,15 @@ def create_group(group_data: GroupCreateRequest, db: Session = Depends(get_db)):
 @router.get("/get_offices")
 def get_offices(db: Session = Depends(get_db)):
     offices = db.query(ProjectOffice).all()
+    print(offices)
     return offices
 
 @router.get("/get_office/{office_id}")
 def get_offices(office_id:int, db: Session = Depends(get_db)):
     office = db.query(ProjectOffice).filter(ProjectOffice.id == office_id).first()
     return office
+
+@router.get('/get_teacher_info/{id}')
+def get_leader_info(id: int, db: Session = Depends(get_db)):
+    user = db.query(User).get(id)
+    return user

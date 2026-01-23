@@ -108,3 +108,5 @@ def get_event_types_by_leader(leader_id: int, db: Session = Depends(get_db), cur
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+
+

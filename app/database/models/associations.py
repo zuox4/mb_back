@@ -1,4 +1,4 @@
-from sqlalchemy import Table, Column, Integer, String, ForeignKey
+from sqlalchemy import Table, Column, Integer, String, ForeignKey, Boolean
 from app.database.database import Base
 
 # Ассоциативная таблица для групп
@@ -15,6 +15,7 @@ p_office_event_association = Table(
     Base.metadata,
     Column('p_office_id', Integer, ForeignKey('project_offices.id',ondelete='CASCADE')),
     Column('event_id', Integer, ForeignKey('events.id',ondelete='CASCADE')),
+    Column('is_important', Boolean, default=False),  # Добавляем флаг важности
 )
 
 # Ассоциативная таблица для ролей пользователей

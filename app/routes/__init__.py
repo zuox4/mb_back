@@ -10,6 +10,7 @@ from .groups import router as groups_router
 from .dailary import router as daily_router
 from .group_leader import router as group_leader_router
 from .project_office import router as project_office_router
+from .events import router as events_router
 
 """Тут регистрируем все роутеры с префиксами"""
 
@@ -25,6 +26,7 @@ api_router.include_router(groups_router, prefix="/groups", tags=["groups"])
 api_router.include_router(daily_router, prefix="/journal", tags=["journal"])
 api_router.include_router(group_leader_router, prefix="/group-leader", tags=["group leader"])
 api_router.include_router(project_office_router, prefix="/project-office", tags=["project"])
+api_router.include_router(events_router, prefix="/events", tags=["events"])
 
 @api_router.get("/health", tags=["health"])
 def api_health_check():

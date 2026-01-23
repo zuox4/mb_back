@@ -34,3 +34,5 @@ def get_events(current_user: User=Depends(get_current_active_teacher), db: Sessi
         for i in event_type.events:
             events.append(i)
     return events
+
+

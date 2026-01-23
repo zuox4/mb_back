@@ -30,3 +30,5 @@ def get_all_groups(db: Session = Depends(get_db), current_user: User = Depends(g
             teacher_classes.append(group)
     print(teacher_classes)
     return teacher_classes
+
+

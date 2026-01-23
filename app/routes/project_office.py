@@ -293,7 +293,9 @@ def get_project_office_events(
             Event.is_active == True
         )
     ).order_by(Event.date_start.desc()).all()
-
+    x = db.query(p_office_event_association).filter(p_office_event_association.c.p_office_id == project_office.id).all()
+    impotant_ids = [i.event_id for i in x if i.is_important == True]
+    print('11111',impotant_ids)
     return [
         {
             "id": event.id,
@@ -301,7 +303,8 @@ def get_project_office_events(
             "date_start": event.date_start,
             "date_end": event.date_end,
             "event_type": event.event_type.title,
-            "description": event.description
+            "description": event.description,
+            'is_important': event.id in impotant_ids,
         }
         for event in events
     ]
@@ -488,3 +491,157 @@ def get_project_office_pivot_data_optimized(
         student_data["events"] = dict(student_data["events"])
 
     return list(result_map.values())
+
+class EventsData(BaseModel):
+    event_ids: List[int]
+
+
+@router.post('/change-events-project')
+def set_events_for_p_office(data: EventsData, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user) ):
+    """
+    Сохраняет мероприятия для проектного офиса.
+    Удаляет старые связи и добавляет новые.
+    """
+
+    try:
+        project_office = db.query(ProjectOffice).filter(
+            ProjectOffice.leader_uid == current_user.id
+        ).first()
+
+
+        if not project_office:
+            raise HTTPException(status_code=404, detail="Проектный офис не найден")
+
+        # 2. Проверяем существование мероприятий
+        if data.event_ids:
+            existing_events = db.query(Event).filter(
+                Event.id.in_(data.event_ids)
+            ).all()
+
+            if len(existing_events) != len(data.event_ids):
+                raise HTTPException(status_code=404, detail="Некоторые мероприятия не найдены")
+
+        # 3. Очищаем существующие связи
+        db.execute(
+            p_office_event_association.delete().where(
+                p_office_event_association.c.p_office_id == project_office.id
+            )
+        )
+
+        # 4. Добавляем новые связи
+        if data.event_ids:
+            new_relations = [
+                {
+                    "p_office_id": project_office.id  ,
+                    "event_id": event_id
+                }
+                for event_id in data.event_ids
+            ]
+
+            if new_relations:
+                db.execute(
+                    p_office_event_association.insert(),
+                    new_relations
+                )
+
+        # 5. Коммитим изменения
+        db.commit()
+
+        # 6. Получаем обновленный список мероприятий
+        updated_office = db.query(ProjectOffice).filter(
+            ProjectOffice.id == project_office.id
+        ).first()
+
+        return {
+            "message": "Мероприятия успешно обновлены",
+            "project_office_id": project_office.id,
+            "event_ids": data.event_ids,
+            "event_count": len(data.event_ids),
+            "events": [
+                {
+                    "id": event.id,
+                    "title": event.title,
+                    "event_type": event.event_type
+                }
+                for event in updated_office.accessible_events
+            ]
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Ошибка при обновлении мероприятий: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Ошибка при обновлении мероприятий: {str(e)}"
+        )
+class EventUptatePriority(BaseModel):
+    value: bool
+
+
+@router.post('/change-event-imp/{event_id}')
+def set_priority_for_project_event(
+        event_id: int,
+        data: EventUptatePriority,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_active_user)
+):
+    """
+    Установить приоритет мероприятия для проектного офиса
+    """
+    # Проверяем, есть ли у пользователя проектный офис
+    if not current_user.p_office:
+        raise HTTPException(
+            status_code=400,
+            detail="Пользователь не привязан к проектному офису"
+        )
+    project_office = db.query(ProjectOffice).filter(
+        ProjectOffice.leader_uid == current_user.id
+    ).first()
+    project_office_id = project_office.id
+
+    # Ищем связь в ассоциативной таблице
+    association = db.execute(
+        p_office_event_association.select().where(
+            and_(
+                p_office_event_association.c.event_id == event_id,
+                p_office_event_association.c.p_office_id == project_office_id
+            )
+        )
+    ).first()
+
+    if not association:
+        # Если связи нет, создаем новую запись
+        try:
+            db.execute(
+                p_office_event_association.insert().values(
+                    event_id=event_id,
+                    p_office_id=project_office_id,
+                    is_important=data.value  # или data.is_important в зависимости от модели
+                )
+            )
+            db.commit()
+            print()
+            return {"message": "Приоритет установлен", "is_important": data.value}
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Ошибка при создании связи: {str(e)}")
+    else:
+        # Если связь есть, обновляем поле is_important
+        print(association)
+        try:
+            db.execute(
+                p_office_event_association.update().where(
+                    and_(
+                        p_office_event_association.c.event_id == event_id,
+                        p_office_event_association.c.p_office_id == project_office_id
+                    )
+                ).values(is_important=data.value)
+            )
+            db.commit()
+            print("Приоритет обновлен", "is_important", data.value)
+            return {"message": "Приоритет обновлен", "is_important": data.value}
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Ошибка при обновлении: {str(e)}")
