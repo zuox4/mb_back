@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.database.database import get_db
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.database.models import User, ProjectOffice, Group, p_office_event_association
+from app.database.models import User, ProjectOffice, Group, p_office_event_association, Achievement
 
 from app.auth.dependencies import get_current_active_user, get_current_user
 from app.routes.mark_book import RecordBookResponse, get_student_record_book_marks_optimized
@@ -127,3 +127,8 @@ def get_record_book_marks(
     except HTTPException as err:
         raise HTTPException(status_code=404, detail=str(err))
     return mark_book
+
+
+@router.get("/achivments")
+def get_achivments(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    return db.query(Achievement).filter(Achievement.student_id==current_user.id).first()

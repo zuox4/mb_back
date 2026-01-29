@@ -35,7 +35,7 @@ class EventDetailResponse(BaseModel):
 
 @router.get('/all_events')
 def get_all_events(db: Session = Depends(get_db)):
-    return db.query(Event).all()
+    return db.query(Event).filter(Event.is_active == True).all()
 
 @router.get("/{event_id}", response_model=EventDetailResponse)
 def get_event(event_id: int, db: Session = Depends(get_db)):
