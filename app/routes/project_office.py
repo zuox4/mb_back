@@ -497,60 +497,72 @@ class EventsData(BaseModel):
 
 
 @router.post('/change-events-project')
-def set_events_for_p_office(data: EventsData, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user) ):
+def set_events_for_p_office(data: EventsData, db: Session = Depends(get_db),
+                            current_user: User = Depends(get_current_active_user)):
     """
-    Сохраняет мероприятия для проектного офиса.
-    Удаляет старые связи и добавляет новые.
+    Сохраняет мероприятия для проектного офиса с использованием ORM.
     """
 
     try:
+        # 1. Находим проектный офис
         project_office = db.query(ProjectOffice).filter(
             ProjectOffice.leader_uid == current_user.id
         ).first()
 
-
         if not project_office:
             raise HTTPException(status_code=404, detail="Проектный офис не найден")
 
-        # 2. Проверяем существование мероприятий
-        if data.event_ids:
-            existing_events = db.query(Event).filter(
-                Event.id.in_(data.event_ids)
-            ).all()
+        # 2. Если новые мероприятия не переданы, очищаем все
+        if not data.event_ids:
+            project_office.accessible_events = []  # Если есть связь events в модели
+            db.commit()
 
-            if len(existing_events) != len(data.event_ids):
-                raise HTTPException(status_code=404, detail="Некоторые мероприятия не найдены")
+            return {
+                "message": "Все мероприятия удалены из проектного офиса",
+                "project_office_id": project_office.id,
+                "event_ids": [],
+                "event_count": 0
+            }
 
-        # 3. Очищаем существующие связи
-        db.execute(
-            p_office_event_association.delete().where(
-                p_office_event_association.c.p_office_id == project_office.id
+        # 3. Проверяем существование новых мероприятий
+        existing_events = db.query(Event).filter(
+            Event.id.in_(data.event_ids)
+        ).all()
+
+        if len(existing_events) != len(data.event_ids):
+            found_event_ids = {event.id for event in existing_events}
+            not_found_ids = [event_id for event_id in data.event_ids if event_id not in found_event_ids]
+            raise HTTPException(
+                status_code=404,
+                detail=f"Мероприятия с ID {not_found_ids} не найдены"
             )
-        )
 
-        # 4. Добавляем новые связи
-        if data.event_ids:
-            new_relations = [
-                {
-                    "p_office_id": project_office.id  ,
-                    "event_id": event_id
-                }
-                for event_id in data.event_ids
-            ]
+        # 4. Получаем текущие мероприятия
+        current_event_ids = {event.id for event in project_office.accessible_events}  # Если есть связь
+        new_event_ids = set(data.event_ids)
 
-            if new_relations:
-                db.execute(
-                    p_office_event_association.insert(),
-                    new_relations
-                )
+        # 5. Определяем мероприятия для удаления и добавления
+        events_to_remove_ids = current_event_ids - new_event_ids
+        events_to_add_ids = new_event_ids - current_event_ids
 
-        # 5. Коммитим изменения
+        # 6. Удаляем ненужные мероприятия
+        if events_to_remove_ids:
+            events_to_remove = db.query(Event).filter(Event.id.in_(events_to_remove_ids)).all()
+            for event in events_to_remove:
+                project_office.accessible_events.remove(event)
+
+        # 7. Добавляем новые мероприятия
+        if events_to_add_ids:
+            events_to_add = db.query(Event).filter(Event.id.in_(events_to_add_ids)).all()
+            for event in events_to_add:
+                project_office.accessible_events.append(event)
+
+        # 8. Сохраняем изменения
+        db.add(project_office)
         db.commit()
 
-        # 6. Получаем обновленный список мероприятий
-        updated_office = db.query(ProjectOffice).filter(
-            ProjectOffice.id == project_office.id
-        ).first()
+        # 9. Обновляем объект из базы
+        db.refresh(project_office)
 
         return {
             "message": "Мероприятия успешно обновлены",
@@ -560,10 +572,9 @@ def set_events_for_p_office(data: EventsData, db: Session = Depends(get_db), cur
             "events": [
                 {
                     "id": event.id,
-                    "title": event.title,
-                    "event_type": event.event_type
+                    "title": event.title
                 }
-                for event in updated_office.accessible_events
+                for event in project_office.accessible_events
             ]
         }
 
