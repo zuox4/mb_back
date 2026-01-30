@@ -22,7 +22,7 @@ router = APIRouter()
     summary="Получить все типы мероприятий",
     description="Получение всех типов мероприятий с полной информацией о стадиях и результатах"
 )
-def get_all_event_types(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_teacher)):
+def get_all_event_types(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     """
     Получение всех типов мероприятий с детальной информацией:
     - Основная информация о типе мероприятия

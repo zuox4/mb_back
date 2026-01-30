@@ -128,7 +128,35 @@ def get_record_book_marks(
         raise HTTPException(status_code=404, detail=str(err))
     return mark_book
 
-
+class Achivments(BaseModel):
+    id: int
+    eventName: str
+    stage: str
+    result: str
+    teacher: str
+    date: str
+    points: int
+    isProfile: bool
 @router.get("/achivments")
 def get_achivments(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
-    return db.query(Achievement).filter(Achievement.student_id==current_user.id).first()
+    achivments_list = db.query(Achievement).filter(Achievement.student_id==current_user.id).all()
+    print(achivments_list)
+    for i in achivments_list:
+        print(i.teacher.display_name)
+    projects_office = db.query(ProjectOffice).join(ProjectOffice.accessible_classes).filter(Group.name==current_user.group_name).first()
+
+    x = db.query(p_office_event_association).filter(
+        p_office_event_association.c.p_office_id == projects_office.id==id).all()
+    impotant_ids = [i.event_id for i in x if i.is_important == True]
+    return [
+        Achivments(
+            id=i.id,
+            eventName=i.event.title,
+            stage=i.stage.title,
+            result=i.result.title,
+            teacher=i.teacher.display_name,
+            isProfile=True if i.event.id in impotant_ids else False,
+            date=str(i.achieved_at),
+            points=i.result.points_for_done
+        )
+     for i in achivments_list]

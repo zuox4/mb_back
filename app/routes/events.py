@@ -33,9 +33,29 @@ class EventDetailResponse(BaseModel):
     total_highschool_students: int  # Добавим для информации
     participation_rate: float  # Процент участия 10-11 классов
 
-@router.get('/all_events')
+
+
+
+class EventDetailForStudent(BaseModel):
+    id: int
+    title: str
+    # description: str
+    # academic_year: str
+    # date_start: str
+    # date_end: str
+    event_type_id: int
+    event_type_name: str
+
+
+
+@router.get('/all_events',response_model=List[EventDetailForStudent])
 def get_all_events(db: Session = Depends(get_db)):
-    return db.query(Event).filter(Event.is_active == True).all()
+    events = db.query(Event).filter(Event.is_active == True).all()
+    return [{'id':i.id,
+             'title':i.title,
+             'event_type_id':i.event_type_id,
+             'event_type_name':i.event_type.title
+             } for i in events]
 
 @router.get("/{event_id}", response_model=EventDetailResponse)
 def get_event(event_id: int, db: Session = Depends(get_db)):
