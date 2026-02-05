@@ -32,3 +32,9 @@ def get_all_groups(db: Session = Depends(get_db), current_user: User = Depends(g
     return teacher_classes
 
 
+@router.get('/for_group_leader/{group_id}')
+def get_class(group_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_teacher)):
+    group_name = db.query(Group).get(group_id).name
+    return db.query(User).filter((User.group_name == group_name) & (User.archived !=True)).all()
+
+

@@ -1,9 +1,9 @@
 import datetime
 from typing import Optional, List
 
-from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from starlette import status
 
 from app.database.database import get_db
 from fastapi import APIRouter, Depends, HTTPException
@@ -11,9 +11,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.database.models import User, ProjectOffice, Group, p_office_event_association, Achievement
 
 from app.auth.dependencies import get_current_active_user, get_current_user
+from app.shemas.student import StudentUpdate
 from app.routes.mark_book import RecordBookResponse, get_student_record_book_marks_optimized
-from app.services.SchoolServices import SchoolService
-
 
 router = APIRouter()
 
@@ -160,3 +159,39 @@ def get_achivments(current_user: User = Depends(get_current_active_user), db: Se
             points=i.result.points_for_done
         )
      for i in achivments_list]
+
+from app.shemas.student import StudentUpdate, StudentCreate, StudentResponse
+@router.patch("/{student_id}", response_model=StudentResponse)
+async def update_student(
+        student_id: int,
+        student_data: StudentUpdate,
+        current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db)
+):
+    """
+    Обновить данные студента (ФИО, email, телефон)
+    """
+
+    student = db.query(User).get(student_id)
+
+    if not student:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Студент не найден"
+        )
+
+    # Проверяем права доступа
+    if "teacher" not in [i.name for i in current_user.roles]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="У вас нет прав для редактирования этого студента"
+        )
+    try:
+        student.email = student_data.email
+        student.updated_at = datetime.datetime.now()
+        db.commit()
+    except HTTPException as err:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(err))
+
+    return student

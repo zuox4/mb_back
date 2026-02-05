@@ -61,7 +61,8 @@ def get_class_journal(
     ).all()
 
     if not students:
-        raise HTTPException(status_code=404, detail="В классе нет учеников")
+        return []
+        # raise HTTPException(status_code=404, detail="В классе нет учеников")
 
     # Получаем тип мероприятия и его стадии
     event_type = db.query(EventType).filter(EventType.id == event.event_type_id).first()

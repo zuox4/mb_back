@@ -348,19 +348,19 @@ def get_project_office_groups(
     ]
 
 
-
-
 @router.get("/pivot-data-optimized")
 def get_project_office_pivot_data_optimized(
         groups: List[str] = Query(None),
         db: Session = Depends(get_db),
         current_user: User = Depends(get_current_active_user)
 ):
+    """
+    Супер-оптимизированная версия pivot-data
+    """
+    import time
+    start_time = time.time()
 
-    """
-    Супер-оптимизированная версия pivot-data (без leader_name)
-    """
-    # 1. Получаем проектный офис
+    # 1. Получаем проектный офис и важные мероприятия ОДИН РАЗ
     project_office = db.query(ProjectOffice).filter(
         ProjectOffice.leader_uid == current_user.id
     ).first()
@@ -368,11 +368,47 @@ def get_project_office_pivot_data_optimized(
     if not project_office:
         raise HTTPException(status_code=404, detail="Проектный офис не найден")
 
-    # 2. Один сложный запрос для получения всех данных (без leader_name)
-    query = db.query(
+    # 2. Получаем важные мероприятия ОДИН РАЗ
+    important_events_query = db.query(p_office_event_association.c.event_id).filter(
+        p_office_event_association.c.p_office_id == project_office.id,
+        p_office_event_association.c.is_important == True
+    )
+    important_event_ids = {row.event_id for row in important_events_query.all()}
+
+    print(f"1. Получение важных мероприятий: {time.time() - start_time:.2f} сек")
+
+    # 3. Основной запрос - получаем только необходимые данные
+    # Используем CTE или подзапросы для оптимизации
+
+    # ВАРИАНТ А: Используем подзапрос для достижений (часто самый быстрый)
+    from sqlalchemy import func
+
+    # Сначала получаем всех студентов и их группы
+    students_query = db.query(
         User.id.label('student_id'),
         User.display_name,
         User.group_name,
+        Group.id.label('group_id')
+    ).join(Group, User.group_name == Group.name) \
+        .join(p_office_group_association, Group.id == p_office_group_association.c.group_id) \
+        .filter(
+        p_office_group_association.c.p_office_id == project_office.id,
+        User.archived == False
+    )
+
+    if groups:
+        students_query = students_query.filter(User.group_name.in_(groups))
+
+    students = students_query.all()
+    student_ids = [s.student_id for s in students]
+
+    if not student_ids:
+        return []
+
+    print(f"2. Получение студентов: {time.time() - start_time:.2f} сек")
+
+    # 4. Получаем все мероприятия проектного офиса
+    events_query = db.query(
         Event.id.label('event_id'),
         Event.title.label('event_title'),
         EventType.id.label('event_type_id'),
@@ -380,117 +416,120 @@ def get_project_office_pivot_data_optimized(
         Stage.id.label('stage_id'),
         Stage.title.label('stage_title'),
         Stage.min_score_for_finished,
-        Stage.stage_order,
-        PossibleResult.points_for_done,
-        Achievement.achieved_at
-    ).select_from(User) \
-        .join(Group, User.group_name == Group.name) \
-        .join(p_office_group_association, Group.id == p_office_group_association.c.group_id) \
-        .join(ProjectOffice, p_office_group_association.c.p_office_id == ProjectOffice.id) \
-        .join(p_office_event_association, ProjectOffice.id == p_office_event_association.c.p_office_id) \
-        .join(Event, p_office_event_association.c.event_id == Event.id) \
+        Stage.stage_order
+    ).join(p_office_event_association, Event.id == p_office_event_association.c.event_id) \
         .join(EventType, Event.event_type_id == EventType.id) \
         .join(Stage, Stage.event_type_id == EventType.id) \
-        .outerjoin(Achievement, and_(
-        Achievement.student_id == User.id,
-        Achievement.event_id == Event.id,
-        Achievement.stage_id == Stage.id
-    )) \
-        .outerjoin(PossibleResult, Achievement.result_id == PossibleResult.id) \
         .filter(
-        ProjectOffice.id == project_office.id,
-        Event.is_active == True,
-        User.archived == False
-    )
+        p_office_event_association.c.p_office_id == project_office.id,
+        Event.is_active == True
+    ) \
+        .order_by(Event.id, Stage.stage_order)
 
-    if groups:
-        query = query.filter(User.group_name.in_(groups))
+    events_data = events_query.all()
 
-    query = query.order_by(User.group_name, User.display_name, Event.title, Stage.stage_order)
-
-    rows = query.all()
-
-    if not rows:
-        return []
-
-    # 3. Группируем данные
-    from collections import defaultdict
-    result_map = defaultdict(lambda: {
-        "id": None,
-        "student_name": None,
-        "group_name": None,
-        "class_teacher": None,  # Оставляем как None или убираем
-        "events": defaultdict(lambda: {
-            "event_name": None,
-            "total_score": 0,
-            "completed_stages_count": 0,
-            "min_stages_required": 0,
-            "stages": [],
-            "status": "не начато"
+    # Группируем мероприятия по event_id для быстрого доступа
+    events_by_id = {}
+    for event in events_data:
+        event_id = event.event_id
+        if event_id not in events_by_id:
+            events_by_id[event_id] = {
+                'event_title': event.event_title,
+                'min_stages_required': event.min_stages_for_completion or 0,
+                'stages': [],
+                'is_important': event_id in important_event_ids
+            }
+        events_by_id[event_id]['stages'].append({
+            'stage_id': event.stage_id,
+            'title': event.stage_title,
+            'min_score': event.min_score_for_finished,
+            'order': event.stage_order
         })
-    })
 
-    # Собираем информацию о минимальных требованиях
-    event_min_requirements = {}
+    print(f"3. Получение мероприятий: {time.time() - start_time:.2f} сек")
 
-    for row in rows:
-        student_key = row.student_id
-        event_key = str(row.event_id)
+    # 5. Получаем ВСЕ достижения студентов для этих мероприятий ОДНИМ запросом
+    achievements_query = db.query(
+        Achievement.student_id,
+        Achievement.event_id,
+        Achievement.stage_id,
+        PossibleResult.points_for_done
+    ).join(PossibleResult, Achievement.result_id == PossibleResult.id) \
+        .filter(
+        Achievement.student_id.in_(student_ids),
+        Achievement.event_id.in_(list(events_by_id.keys()))
+    ) \
+        .order_by(Achievement.student_id, Achievement.event_id, Achievement.stage_id)
 
-        # Инициализируем студента
-        if result_map[student_key]["id"] is None:
-            result_map[student_key].update({
-                "id": row.student_id,
-                "student_name": row.display_name or f"Ученик {row.student_id}",
-                "group_name": row.group_name,
-                # class_teacher оставляем как None или убираем
-            })
+    # Группируем достижения по студенту и мероприятию
+    from collections import defaultdict
+    achievements_by_student_event = defaultdict(lambda: defaultdict(dict))
 
-        # Инициализируем мероприятие
-        event_data = result_map[student_key]["events"][event_key]
-        if event_data["event_name"] is None:
-            event_data.update({
-                "event_name": row.event_title,
-                "min_stages_required": row.min_stages_for_completion or 0
-            })
-            event_min_requirements[event_key] = row.min_stages_for_completion or 0
+    for ach in achievements_query.all():
+        achievements_by_student_event[ach.student_id][ach.event_id][ach.stage_id] = ach.points_for_done or 0
 
-        # Добавляем стадию
-        current_score = row.points_for_done or 0
-        status = "зачет" if current_score >= (row.min_score_for_finished or 0) else "незачет"
+    print(f"4. Получение достижений: {time.time() - start_time:.2f} сек")
 
-        # Проверяем, не добавлена ли уже эта стадия
-        stage_exists = any(stage.get("name") == row.stage_title for stage in event_data["stages"])
-        if not stage_exists:
-            event_data["stages"].append({
-                "name": row.stage_title,
-                "status": status,
-                "current_score": current_score
-            })
+    # 6. Собираем финальный результат
+    result = []
 
-            # Обновляем общие показатели
-            event_data["total_score"] += current_score
-            if status == "зачет":
-                event_data["completed_stages_count"] += 1
+    for student in students:
+        student_data = {
+            "id": student.student_id,
+            "student_name": student.display_name or f"Ученик {student.student_id}",
+            "group_name": student.group_name,
+            "class_teacher": None,
+            "events": {}
+        }
 
-    # 4. Определяем финальные статусы мероприятий
-    for student_data in result_map.values():
-        for event_key, event_data in student_data["events"].items():
-            min_required = event_min_requirements.get(event_key, len(event_data["stages"]))
+        student_achievements = achievements_by_student_event.get(student.student_id, {})
 
-            if event_data["completed_stages_count"] >= min_required:
-                event_data["status"] = "зачет"
-            elif event_data["total_score"] > 0:
-                event_data["status"] = "в процессе"
-            # else остается "не начато"
+        for event_id, event_info in events_by_id.items():
+            event_achievements = student_achievements.get(event_id, {})
 
-            # Конвертируем defaultdict в обычный dict
-            student_data["events"][event_key] = dict(event_data)
+            # Считаем статистику по мероприятию
+            total_score = 0
+            completed_stages_count = 0
+            stages_list = []
 
-        # Конвертируем events в обычный dict
-        student_data["events"] = dict(student_data["events"])
+            for stage_info in event_info['stages']:
+                stage_score = event_achievements.get(stage_info['stage_id'], 0)
+                status = "зачет" if stage_score >= (stage_info['min_score'] or 0) else "незачет"
 
-    return list(result_map.values())
+                stages_list.append({
+                    "name": stage_info['title'],
+                    "status": status,
+                    "current_score": stage_score
+                })
+
+                total_score += stage_score
+                if status == "зачет":
+                    completed_stages_count += 1
+
+            # Определяем общий статус мероприятия
+            if completed_stages_count >= event_info['min_stages_required']:
+                status = "зачет"
+            elif total_score > 0:
+                status = "в процессе"
+            else:
+                status = "не начато"
+
+            student_data["events"][str(event_id)] = {
+                "event_name": event_info['event_title'],
+                "total_score": total_score,
+                "completed_stages_count": completed_stages_count,
+                "min_stages_required": event_info['min_stages_required'],
+                "is_important": event_info['is_important'],
+                "stages": stages_list,
+                "status": status
+            }
+
+        result.append(student_data)
+
+    print(f"5. Формирование результата: {time.time() - start_time:.2f} сек")
+    print(f"Итого: {time.time() - start_time:.2f} сек")
+
+    return result
 
 class EventsData(BaseModel):
     event_ids: List[int]

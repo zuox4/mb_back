@@ -34,3 +34,9 @@ def get_events(current_user: User=Depends(get_current_active_teacher), db: Sessi
         for i in event_type.events:
             events.append(i)
     return events
+
+@router.get("/students")
+def get_students(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_teacher)):
+
+    x = db.query(User).filter(User.group_name=='11-Т').all()
+    return x
