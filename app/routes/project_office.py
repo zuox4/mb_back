@@ -352,18 +352,23 @@ def get_project_office_groups(
 def get_project_office_pivot_data_optimized(
         groups: List[str] = Query(None),
         db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_active_user)
+        current_user: User = Depends(get_current_active_user),
+        p_office_id: int = Query(None),
 ):
     """
     Супер-оптимизированная версия pivot-data
     """
     import time
     start_time = time.time()
-
+    print(p_office_id)
+    if p_office_id:
+        project_office = db.query(ProjectOffice).get(p_office_id)
+        print(project_office)
     # 1. Получаем проектный офис и важные мероприятия ОДИН РАЗ
-    project_office = db.query(ProjectOffice).filter(
-        ProjectOffice.leader_uid == current_user.id
-    ).first()
+    else:
+        project_office = db.query(ProjectOffice).filter(
+            ProjectOffice.leader_uid == current_user.id
+        ).first()
 
     if not project_office:
         raise HTTPException(status_code=404, detail="Проектный офис не найден")
@@ -628,7 +633,7 @@ def set_events_for_p_office(data: EventsData, db: Session = Depends(get_db),
         )
 class EventUptatePriority(BaseModel):
     value: bool
-
+    p_office_id: str
 
 @router.post('/change-event-imp/{event_id}')
 def set_priority_for_project_event(
@@ -636,19 +641,24 @@ def set_priority_for_project_event(
         data: EventUptatePriority,
         db: Session = Depends(get_db),
         current_user: User = Depends(get_current_active_user)
+
+
 ):
     """
     Установить приоритет мероприятия для проектного офиса
     """
     # Проверяем, есть ли у пользователя проектный офис
-    if not current_user.p_office:
+    if not current_user.p_office or 'admin' not in [i.name for i in current_user.roles]:
         raise HTTPException(
             status_code=400,
             detail="Пользователь не привязан к проектному офису"
         )
-    project_office = db.query(ProjectOffice).filter(
-        ProjectOffice.leader_uid == current_user.id
-    ).first()
+    if data.p_office_id:
+        project_office = db.query(ProjectOffice).get(data.p_office_id)
+    else:
+        project_office = db.query(ProjectOffice).filter(
+            ProjectOffice.leader_uid == current_user.id
+        ).first()
     project_office_id = project_office.id
 
     # Ищем связь в ассоциативной таблице
@@ -695,3 +705,9 @@ def set_priority_for_project_event(
         except Exception as e:
             db.rollback()
             raise HTTPException(status_code=500, detail=f"Ошибка при обновлении: {str(e)}")
+
+
+@router.get('/{project_office_id}')
+def get_project_office(project_office_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+
+    return db.get(ProjectOffice, project_office_id)
