@@ -148,6 +148,8 @@ def login(
         data={"sub": user.email, "user_id": user.id, "type": "refresh"},
         expires_delta=refresh_token_expires
     )
+    user.last_login_at = datetime.datetime.today()
+    db.commit()
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
@@ -215,7 +217,8 @@ def refresh_token(
             data={"sub": user.email, "user_id": user.id, "type": "refresh"},
             expires_delta=timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
         )
-
+        user.last_login_at = datetime.datetime.today()
+        db.commit()
         return {
             "access_token": access_token,
             "refresh_token": new_refresh_token,  # Добавьте это

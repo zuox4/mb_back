@@ -24,7 +24,7 @@ api_router.include_router(event_type_router, prefix="/event-types", tags=["event
 api_router.include_router(event_leader_router, prefix="/event-leader", tags=["event-leader"])
 api_router.include_router(groups_router, prefix="/groups", tags=["groups"])
 api_router.include_router(daily_router, prefix="/journal", tags=["journal"])
-api_router.include_router(group_leader_router, prefix="/group-leader", tags=["group leader"])
+api_router.include_router(group_leader_router, prefix="/group-leader", tags=["group-leader"])
 api_router.include_router(project_office_router, prefix="/project-office", tags=["project"])
 api_router.include_router(events_router, prefix="/events", tags=["events"])
 

@@ -46,7 +46,6 @@ def get_user_main_data(current_user: User = Depends(get_current_active_user),  d
         'has_event_types': has_event_types,
         'has_groups_leader': has_groups_leader,
         'has_admin': has_admin,
-
         }
 
 

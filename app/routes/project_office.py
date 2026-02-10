@@ -709,5 +709,6 @@ def set_priority_for_project_event(
 
 @router.get('/{project_office_id}')
 def get_project_office(project_office_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-
-    return db.get(ProjectOffice, project_office_id)
+    p_office = db.get(ProjectOffice, project_office_id)
+    teacher = p_office.leader
+    return {'p_office': p_office, 'teacher': {'id': teacher.id, 'email':teacher.email, 'image': teacher.image, 'phone': teacher.phone, 'lastLogin': teacher.last_login_at }}
