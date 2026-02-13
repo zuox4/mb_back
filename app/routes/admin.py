@@ -376,3 +376,52 @@ def get_offices(office_id:int, db: Session = Depends(get_db)):
 def get_leader_info(id: int, db: Session = Depends(get_db)):
     user = db.query(User).get(id)
     return user
+
+
+@router.get('/get_teachers_info')
+def get_teachers_info(db: Session = Depends(get_db)):
+    teachers = db.query(User).filter(User.roles.any(name='teacher')).all()
+
+    return [{
+        'id': teacher.id,
+        'display_name': teacher.display_name,
+        'email': teacher.email,
+        'roles': [role.name for role in teacher.roles],
+        'image': teacher.image,
+    } for teacher in teachers]
+
+
+class AssignResponsibleRequest(BaseModel):
+    teacherId: Optional[int] = None
+    eventTypeId: int
+
+
+@router.post('/assign_responsible')
+def assign_responsible(
+        request: AssignResponsibleRequest,
+        db: Session = Depends(get_db)
+):
+    """Назначение ответственного за тип мероприятия"""
+    print(request.teacherId)
+
+    # Находим тип мероприятия
+    event_type = db.query(EventType).filter(EventType.id == request.eventTypeId).first()
+    if not event_type:
+        raise HTTPException(status_code=404, detail="Event type not found")
+    teacher = db.query(User).filter(User.id == request.teacherId).first()
+    # Назначаем ответственного
+    event_type.leader = teacher
+
+    db.commit()
+    db.refresh(event_type)
+
+    return {
+        "success": True,
+        "teacher_id": request.teacherId,
+        "event_type_id": request.eventTypeId,
+    }
+
+@router.get('/event-types/{id}')
+def event_types(id: int, db: Session = Depends(get_db)):
+    event_type = db.query(EventType).filter(EventType.id == id).first()
+    return {'leader': event_type.leader if event_type else None,}
