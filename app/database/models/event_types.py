@@ -1,7 +1,7 @@
 from sqlalchemy.orm import relationship
 
 from ..database import Base
-from sqlalchemy import Column, Integer, String, ForeignKey,Text
+from sqlalchemy import Column, Integer, String, ForeignKey,Text, Boolean
 
 
 class EventType(Base):
@@ -15,7 +15,7 @@ class EventType(Base):
     stages = relationship("Stage", back_populates="event_type")
     leader_id = Column(Integer, ForeignKey("users.id"))
     min_stages_for_completion = Column(Integer, default=0)
-
+    is_archived = Column(Boolean, default=False)
 
     leader = relationship("User", back_populates="event_types")
 

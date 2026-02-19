@@ -424,4 +424,4 @@ def assign_responsible(
 @router.get('/event-types/{id}')
 def event_types(id: int, db: Session = Depends(get_db)):
     event_type = db.query(EventType).filter(EventType.id == id).first()
-    return {'leader': event_type.leader if event_type else None,}
+    return {'leader': event_type.leader if event_type else None}

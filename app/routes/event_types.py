@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
-from app.database.models import User
+from app.database.models import User, Event, EventType
 from app.auth.dependencies import get_current_active_user, get_current_active_teacher
 from app.database.database import get_db
 from app.services.event_type_service.event_type_service import EventTypeService
@@ -11,6 +11,7 @@ from app.services.event_type_service.schemas import (
     EventTypeCreate,
     EventTypeUpdate
 )
+from sqlalchemy import update
 
 
 router = APIRouter()
@@ -109,4 +110,17 @@ def get_event_types_by_leader(leader_id: int, db: Session = Depends(get_db), cur
             detail=str(e)
         )
 
-
+@router.post(
+    "/{event_type_id}",
+)
+def delete_event_type(
+    event_type_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_teacher)):
+    try:
+        event_type = db.get(EventType, event_type_id)
+        event_type.is_archived = True
+        db.commit()
+        return {'message': 'Успешно обновлено'}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )

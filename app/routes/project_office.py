@@ -648,7 +648,10 @@ def set_priority_for_project_event(
     Установить приоритет мероприятия для проектного офиса
     """
     # Проверяем, есть ли у пользователя проектный офис
-    if not current_user.p_office or 'admin' not in [i.name for i in current_user.roles]:
+    user_roles = [role.name for role in current_user.roles]
+    is_admin = 'admin' in user_roles
+
+    if not is_admin and current_user.p_office is None:
         raise HTTPException(
             status_code=400,
             detail="Пользователь не привязан к проектному офису"
@@ -682,7 +685,7 @@ def set_priority_for_project_event(
                 )
             )
             db.commit()
-            print()
+
             return {"message": "Приоритет установлен", "is_important": data.value}
         except Exception as e:
             db.rollback()

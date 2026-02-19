@@ -62,6 +62,7 @@ class EventTypeResponse(EventTypeBase):
     id: int
     stages: List[StageResponse]
     leader: Optional[UserSimpleResponse]
+    is_archived: Optional[bool] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     events: List[Event]
